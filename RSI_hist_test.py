@@ -79,6 +79,7 @@ print("-"*65)
 print(f"Simulation Complete.")
 print(f"Final Portfolio Value: ${final_value:.2f} | Total Return: {total_return:.2f}%")
 
+
 plt.figure(figsize=(12, 6))
 plt.plot(data.index, data['Portfolio_Value'], label='RSI + 5% SL + 10% Target', color='darkorange', linewidth=2)
 plt.title(f'RSI Strategy with Fixed Profit Targets on {ticker}')

@@ -4,18 +4,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Define pool of tickers
-ticker_pool = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX", "COST",
-    "INTC", "CSCO", "CMCSA", "PEP", "ADBE", "QCOM", "TXN", "AMGN", "HON", "AMAT",
-    "SBUX", "BKNG", "VRTX", "MDLZ", "GILD", "REGN", "LRCX", "PANW", "SNPS", "KLAC",
-    "CDNS", "ASML", "MELI", "MAR", "ORLY", "CTAS", "NXPI", "WDAY", "MNST", "LULU",
-    "JPM", "BAC", "WMT", "DIS", "XOM", "CVX", "UNH", "HD", "V", "MA", "PG", "ABBV",
-    "LLY", "MRK", "PFE", "T", "VZ", "KO", "ORCL", "CRM", "NKE", "ADSK", "AAL", "DAL",
-    "UAL", "BA", "CAT", "DE", "GE", "MMM", "F", "GM", "UBER", "ABNB", "COIN", "PLTR"]
-
+ticker_pool = ["AAPL", "MSFT", "GOOGL", #"AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX", "COST",
+    #"INTC", "CSCO", "CMCSA", "PEP", "ADBE", "QCOM", "TXN", "AMGN", "HON", "AMAT",
+    #"SBUX", "BKNG", "VRTX", "MDLZ", "GILD", "REGN", "LRCX", "PANW", "SNPS", "KLAC",
+    #"CDNS", "ASML", "MELI", "MAR", "ORLY", "CTAS", "NXPI", "WDAY", "MNST", "LULU",
+    #"JPM", "BAC", "WMT", "DIS", "XOM", "CVX", "UNH", "HD", "V", "MA", "PG", "ABBV",
+    #"LLY", "MRK", "PFE", "T", "VZ", "KO", "ORCL", "CRM", "NKE", "ADSK", "AAL", "DAL",
+    #"UAL", "BA", "CAT", "DE", "GE", "MMM", "F", "GM", "UBER", "ABNB", "COIN", "PLTR"]
+]
 
 ticker = "AAPL"  
 # Download data for the defined pool of tickers and SPY as a benchmark
-raw_data = yf.download(ticker_pool + ["SPY"], period="200d", interval="1h")
+raw_data = yf.download(ticker_pool + ["SPY"], period="100d", interval="1h")
 
 # Create a dataset of close prices and volumes
 close_prices = raw_data['Close'].copy().astype(float)
@@ -34,7 +34,7 @@ losses = -price_changes.clip(upper=0)
 # Calculate a short and a longer EMA
 ema_period_20 = 20
 ema_values_20 = close_prices[ticker].ewm(span=ema_period_20, adjust=False).mean()
-ema_period_9 = 9
+ema_period_9 = 12
 ema_values_9 = close_prices[ticker].ewm(span=ema_period_9, adjust=False).mean()
 
 # Calculating EMA crossover signals
@@ -47,46 +47,106 @@ ema_gains_20 = ema_values_20_changes.clip(lower=0)
 ema_losses_20 = -ema_values_20_changes.clip(upper=0)
 
 # Simulating a simple trading strategy based on EMA crossovers
-cash = close_prices[ticker].iloc[0] 
+cash = 10000.0
 position = 0               
 purchase_price = 0.0      
 portfolio_value = [] 
+trailing_floor_history = []  
 
 # Loop using an index 
 for i in range(len(close_prices)):
     close_price = close_prices[ticker].iloc[i]
     
     # Since i = 0 the first iteration is skipped
-    if i == 0:
+    if i < 20:
         portfolio_value.append(cash)
         continue
 
     # Calculate the signals inside the loop for day 'i'
-    ema_buy_signal = (ema_values_9.iloc[i] > ema_values_20.iloc[i]) and (ema_values_9.iloc[i-1] < ema_values_20.iloc[i-1])
-    ema_sell_signal = (ema_values_9.iloc[i] < ema_values_20.iloc[i]) and (ema_values_9.iloc[i-1] > ema_values_20.iloc[i-1])
+    e9_today = ema_values_9.iloc[i]
+    e20_today = ema_values_20.iloc[i]
+    e9_yest = ema_values_9.iloc[i-1]
+    e20_yest = ema_values_20.iloc[i-1]
+
+    ema_buy_signal = (e9_today > e20_today) and (e9_yest < e20_yest)
+    ema_sell_signal = (e9_today < e20_today) and (e9_yest > e20_yest)
+
+    # Market closing logic to avoid holding positions overnight
+    current_time = close_prices.index[i]
+    market_closing = (current_time.hour == 16 and current_time.minute == 0) 
 
     # Execution Logic
     if ema_buy_signal and position == 0:
         position = int(cash // close_price)
         purchase_price = close_price
+        max_price = close_price
         cash -= position * close_price
-        print(f"Bought {position} shares at {close_price:.2f}") # Optional: see trades
+        print(f"Bought {position} shares at {close_price:.2f}") 
 
-    elif ema_sell_signal and position > 0:
-        cash += position * close_price
-        print(f"Sold {position} shares at {close_price:.2f} | Profit: {(close_price - purchase_price) * position:.2f}")
-        position = 0
-        purchase_price = 0.0
+    elif position > 0:
+        if close_price > max_price:
+            max_price = close_price  
+
+        trailing_floor = max_price * 0.97
+
+        if close_price < trailing_floor:
+            cash += position * close_price
+            print(f"Trailing stop triggered. Sold at {close_price:.2f} | Peak was {max_price:.2f}")
+            position = 0
+            purchase_price = 0.0
+            max_price = 0.0
+
+        elif ema_sell_signal and position > 0:
+            cash += position * close_price
+            print(f"Sold {position} shares at {close_price:.2f} | Profit: {(close_price - purchase_price) * position:.2f}")
+            position = 0
+            purchase_price = 0.0
+
+        elif current_time.hour == 15:
+            cash += position * close_price
+            print(f"Market closing. Sold {position} shares at {close_price:.2f} | Profit/Loss: {(close_price - purchase_price) * position:.2f}")
+            position = 0
+            purchase_price = 0.0
         
     # Track portfolio value at the end of every single step
     portfolio_value.append(cash + (position * close_price))
+    
+    if position > 0:
+        trailing_floor_history.append(max_price * 0.90)
+    else:
+        trailing_floor_history.append(np.nan)
 
-plt.figure(figsize=(12, 6))
-plt.plot(close_prices.index, close_prices[ticker], label=ticker)
-plt.plot(close_prices.index, portfolio_value, label='Portfolio Value', color='orange')
-plt.xlabel('Date/Time')
-plt.ylabel('Price')
-plt.title(f'{ticker} Price Movement')
-plt.legend()
-plt.grid()
+# Find the starting values at index 20 where the trading loop begins
+stock_start_price = close_prices[ticker].iloc[20]
+portfolio_start_value = portfolio_value[20]
+
+# Convert both datasets into percentages starting at 100%
+normalized_stock = (close_prices[ticker] / stock_start_price) * 100
+normalized_portfolio = (np.array(portfolio_value) / portfolio_start_value) * 100
+
+# Print results summary
+portfolio_return = normalized_portfolio[-1] - 100
+stock_return = normalized_stock.iloc[-1] - 100
+print(f"\nFinal Portfolio Value: ${portfolio_value[-1]:.2f} | Total Return: {portfolio_return:.2f}%")
+print(f"{ticker} Stock Performance: {stock_return:.2f}% over the same period.")
+
+# Create the chart
+fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+
+# Plot the percentage returns of the portfolio against the stock's performance
+axs[0].plot(close_prices.index[20:], normalized_stock[20:], label=f'{ticker} Performance (%)', alpha=0.5)
+axs[0].plot(close_prices.index[20:], normalized_portfolio[20:], label='Strategy Performance (%)', color='orange', linewidth=2)
+axs[1].plot(close_prices.index[20:], ema_values_9[20:], label='EMA 9', color='green', linestyle='--', alpha=0.7)
+axs[1].plot(close_prices.index[20:], ema_values_20[20:], label='EMA 20', color='red', linestyle='--', alpha=0.7)
+axs[1].plot(close_prices.index[20:], trailing_floor_history, label='Trailing Stop (97% of Peak)', color='blue', linestyle=':', alpha=0.7)
+axs[0].set_xlabel('Date/Time')
+axs[0].set_ylabel('Growth / Return (%)')
+axs[0].set_title(f'{ticker} vs Strategy Performance (Normalized to 100%)')
+axs[0].legend()
+axs[1].set_xlabel('Date/Time')
+axs[1].set_ylabel('EMA Values')
+axs[1].set_title('Exponential Moving Averages')
+axs[1].legend()
+axs[0].grid()
+axs[1].grid()
 plt.show()
