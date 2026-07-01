@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Define pool of tickers
-ticker_pool = ["AAPL", "MSFT", "GOOGL", #"AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX", "COST",
+ticker_pool = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX", "COST",
     #"INTC", "CSCO", "CMCSA", "PEP", "ADBE", "QCOM", "TXN", "AMGN", "HON", "AMAT",
     #"SBUX", "BKNG", "VRTX", "MDLZ", "GILD", "REGN", "LRCX", "PANW", "SNPS", "KLAC",
     #"CDNS", "ASML", "MELI", "MAR", "ORLY", "CTAS", "NXPI", "WDAY", "MNST", "LULU",
@@ -61,7 +61,7 @@ for i in range(len(close_prices)):
     close_price = close_prices[ticker].iloc[i]
     
     # Since i = 0 the first iteration is skipped
-    if i < 20:
+    if i < 200:
         portfolio_value.append(cash)
         continue
 
@@ -75,9 +75,11 @@ for i in range(len(close_prices)):
     e50_today = ema_values_50.iloc[i]
     e50_yest = ema_values_50.iloc[i-1]
 
+    ema_spread_12_26 = (e12_today - e26_today) / e26_today
+
     #ema_buy_signal = (e12_today > e200_today) and (e12_yest < e200_yest)
-    ema_buy_signal = (e26_today > e200_today) and (e12_today > e50_today) and (e50_today > e200_today)
-    ema_sell_signal = (e12_today < e26_today) and (e12_yest > e26_yest) and (e12_today < e50_today) and (e12_today < e200_today)
+    ema_buy_signal = (ema_spread_12_26 > 0.005) and (e26_today > e50_today > e200_today)
+    ema_sell_signal = (ema_spread_12_26 < -0.05) and (e26_today < e200_today)
 
     # Market closing logic to avoid holding positions overnight
     current_time = close_prices.index[i]
@@ -120,18 +122,18 @@ for i in range(len(close_prices)):
     portfolio_value.append(cash + (position * close_price))
     
     if position > 0:
-        trailing_floor_history.append(max_price * 0.90)
+        trailing_floor_history.append(max_price * 0.95)
     else:
         trailing_floor_history.append(np.nan)
 
-# Find the starting values at index 20 where the trading loop begins
-stock_start_price = close_prices[ticker].iloc[20]
-portfolio_start_value = portfolio_value[20]
+# Find the starting values at index 200 where the trading loop begins
+stock_start_price = close_prices[ticker].iloc[200]
+portfolio_start_value = portfolio_value[200]
 
 # Convert both datasets into percentages starting at 100%
 normalized_stock = (close_prices[ticker] / stock_start_price) * 100
 normalized_portfolio = (np.array(portfolio_value) / portfolio_start_value) * 100
-normalized_sp500 = (close_prices["SPY"] / close_prices["SPY"].iloc[20]) * 100
+normalized_sp500 = (close_prices["SPY"] / close_prices["SPY"].iloc[200]) * 100
 
 # Print results summary
 portfolio_return = normalized_portfolio[-1] - 100
@@ -143,14 +145,14 @@ print(f"{ticker} Stock Performance: {stock_return:.2f}% over the same period.")
 fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
 
 # Plot the percentage returns of the portfolio against the stock's performance
-axs[0].plot(close_prices.index[20:], normalized_stock[20:], label=f'{ticker} Performance (%)', alpha=0.5)
-axs[0].plot(close_prices.index[20:], normalized_portfolio[20:], label='Strategy Performance (%)', color='orange', linewidth=2)
-axs[1].plot(close_prices.index[20:], ema_values_12[20:], label='EMA 12', color='green', linestyle='--', alpha=0.7)
-axs[1].plot(close_prices.index[20:], ema_values_26[20:], label='EMA 26', color='red', linestyle='--', alpha=0.7)
-axs[1].plot(close_prices.index[20:], trailing_floor_history, label='Trailing Stop (97% of Peak)', color='blue', linestyle=':', alpha=0.7)
-axs[0].plot(close_prices.index[20:], normalized_sp500[20:], label='SPY Performance (%)', color='gray', linestyle='-', alpha=0.5)
-axs[1].plot(close_prices.index[20:], ema_values_200[20:], label='EMA 200', color='purple', linestyle='-', alpha=0.5)
-axs[1].plot(close_prices.index[20:], ema_values_50[20:], label='EMA 50', color='brown', linestyle='-', alpha=0.5)
+axs[0].plot(close_prices.index[200:], normalized_stock[200:], label=f'{ticker} Performance (%)', alpha=0.5)
+axs[0].plot(close_prices.index[200:], normalized_portfolio[200:], label='Strategy Performance (%)', color='orange', linewidth=2)
+axs[1].plot(close_prices.index[200:], ema_values_12[200:], label='EMA 12', color='green', linestyle='--', alpha=0.7)
+axs[1].plot(close_prices.index[200:], ema_values_26[200:], label='EMA 26', color='red', linestyle='--', alpha=0.7)
+axs[1].plot(close_prices.index[200:], trailing_floor_history, label='Trailing Stop (95% of Peak)', color='blue', linestyle=':', alpha=0.7)
+axs[0].plot(close_prices.index[200:], normalized_sp500[200:], label='SPY Performance (%)', color='gray', linestyle='-', alpha=0.5)
+axs[1].plot(close_prices.index[200:], ema_values_200[200:], label='EMA 200', color='purple', linestyle='-', alpha=0.5)
+axs[1].plot(close_prices.index[200:], ema_values_50[200:], label='EMA 50', color='brown', linestyle='-', alpha=0.5)
 axs[0].set_xlabel('Date/Time')
 axs[0].set_ylabel('Growth / Return (%)')
 axs[0].set_title(f'{ticker} vs Strategy Performance (Normalized to 100%)')
