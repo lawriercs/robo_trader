@@ -75,7 +75,7 @@ def backtest_strategy(ticker):
             if close_price > max_price:
                 max_price = close_price  
 
-            trailing_floor = max_price * 0.95
+            trailing_floor = max_price * 0.93
 
             if close_price < trailing_floor:
                 cash += position * close_price
@@ -94,7 +94,7 @@ def backtest_strategy(ticker):
         portfolio_value.append(cash + (position * close_price))
         
         if position > 0:
-            trailing_floor_history.append(max_price * 0.95)
+            trailing_floor_history.append(max_price * 0.93)
         else:
             trailing_floor_history.append(np.nan)
 
