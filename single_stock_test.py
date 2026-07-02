@@ -112,18 +112,18 @@ for i in range(len(close_prices)):
     ema_spread_12_26 = (e12_today - e26_today) / e26_today
 
     #ema_buy_signal = (e12_today > e200_today) and (e12_yest < e200_yest) and (e26_today > e50_today) 
-    ema_buy_signal = (ema_spread_12_26 > 0.005) and (e26_today > e50_today > e200_today) 
-    ema_sell_signal = (ema_spread_12_26 < -0.05) and (e12_today < e50_today) and (e26_today < e200_today)
+    ema_buy_signal = (ema_spread_12_26 > 0.005) and (e50_today > e200_today)
+    ema_sell_signal = (ema_spread_12_26 < -0.01) and (e50_today < e200_today)
 
     #market_is_trending = adx_today > 20
 
     # Execution Logic
-    if ema_buy_signal and adx_today > 20 and position == 0:
+    if ema_buy_signal and adx_today >= 20 and position == 0:
         position = int(cash // close_price)
         purchase_price = close_price
         max_price = close_price
         cash -= position * close_price
-        print(f"Bought {position} shares at {close_price:.2f}") 
+       #print(f"Bought {position} shares at {close_price:.2f}") 
 
     elif position > 0:
         if close_price > max_price:
@@ -133,14 +133,19 @@ for i in range(len(close_prices)):
 
         if close_price < trailing_floor:
             cash += position * close_price
-            print(f"Trailing stop triggered. Sold at {close_price:.2f} | Peak was {max_price:.2f}")
+            #print(f"Trailing stop triggered. Sold at {close_price:.2f} | Peak was {max_price:.2f}")
             position = 0
             purchase_price = 0.0
             max_price = 0.0
 
-        elif ema_sell_signal and adx_today > 20 and position > 0:
+        elif close_price >= purchase_price * 1.08: # Sell at an 8% gain
             cash += position * close_price
-            print(f"Sold {position} shares at {close_price:.2f} | Profit: {(close_price - purchase_price) * position:.2f}")
+            position = 0
+            purchase_price = 0.0
+
+        elif ema_sell_signal and adx_today >= 20 and position > 0:
+            cash += position * close_price
+            #print(f"Sold {position} shares at {close_price:.2f} | Profit: {(close_price - purchase_price) * position:.2f}")
             position = 0
             purchase_price = 0.0
 
