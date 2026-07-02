@@ -15,7 +15,7 @@ ticker_pool = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "
 
 ticker = "META"  
 # Download data for the defined pool of tickers and SPY as a benchmark
-raw_data = yf.download(ticker_pool + ["SPY"], period="300d", interval="1h")
+raw_data = yf.download(ticker_pool + ["SPY"], period = '300d', interval="1h")
 
 # Create a dataset of close prices and volumes
 close_prices = raw_data['Close'].copy().astype(float)
@@ -112,8 +112,8 @@ for i in range(len(close_prices)):
     ema_spread_12_26 = (e12_today - e26_today) / e26_today
 
     #ema_buy_signal = (e12_today > e200_today) and (e12_yest < e200_yest) and (e26_today > e50_today) 
-    ema_buy_signal = (ema_spread_12_26 > 0.005) and (e50_today > e200_today)
-    ema_sell_signal = (ema_spread_12_26 < -0.01) and (e50_today < e200_today)
+    ema_buy_signal = (ema_spread_12_26 > 0.005) #and (e50_today > e200_today)
+    ema_sell_signal = (ema_spread_12_26 < -0.01) 
 
     #market_is_trending = adx_today > 20
 
@@ -136,7 +136,7 @@ for i in range(len(close_prices)):
             #print(f"Trailing stop triggered. Sold at {close_price:.2f} | Peak was {max_price:.2f}")
             position = 0
             purchase_price = 0.0
-            max_price = 0.0
+            
 
         elif close_price >= purchase_price * 1.08: # Sell at an 8% gain
             cash += position * close_price
@@ -156,7 +156,8 @@ for i in range(len(close_prices)):
             #purchase_price = 0.0
         
     # Track portfolio value at the end of every single step
-    portfolio_value.append(cash + (position * close_price))
+    current_step_value = float(cash + (position * close_price))
+    portfolio_value.append(current_step_value)
     
     if position > 0:
         trailing_floor_history.append(max_price * 0.93)

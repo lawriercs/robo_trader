@@ -8,7 +8,7 @@ ticker_pool = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "
 
 # --- FIX 1: DOWNLOAD DATA ONCE OUTSIDE THE LOOP ---
 print("Downloading data...")
-raw_data = yf.download(ticker_pool + ["SPY"], period="300d", interval="1h")
+raw_data = yf.download(ticker_pool + ["SPY"], start="2024-08-01", end="2025-08-01", interval="1h")
 
 def calculate_adx(high, low, close, period=14):
     tr1 = high - low
@@ -30,7 +30,7 @@ def calculate_adx(high, low, close, period=14):
     adx = dx.ewm(alpha=1/period, adjust=False).mean()
     return adx
 
-def backtest_strat(ticker, buy_thresh, sell_thresh, adx_thresh):
+def backtest_strat(ticker, buy_thresh, sell_thresh, adx_thresh, stop_loss, profit_target):
     # Slice downloaded global data for this specific run
     close_prices = raw_data['Close'].copy().astype(float)
     
@@ -52,6 +52,7 @@ def backtest_strat(ticker, buy_thresh, sell_thresh, adx_thresh):
     cash = 10000.0
     position = 0               
     purchase_price = 0.0      
+    max_price = 0.0
     portfolio_value = [] 
     
     for i in range(len(close_prices_ticker)):
@@ -70,8 +71,8 @@ def backtest_strat(ticker, buy_thresh, sell_thresh, adx_thresh):
         ema_spread_12_26 = (e12_today - e26_today) / e26_today
 
         # --- FIX 2: STATE FILTER INSTEAD OF ON-THE-HOUR CROSSOVER ---
-        ema_buy_signal = (ema_spread_12_26 > buy_thresh) and (e50_today > e200_today)
-        ema_sell_signal = (ema_spread_12_26 < sell_thresh) and (e50_today < e200_today)
+        ema_buy_signal = (ema_spread_12_26 > buy_thresh) 
+        ema_sell_signal = (ema_spread_12_26 < sell_thresh) 
 
         if ema_buy_signal and adx_today >= adx_thresh and position == 0:
             position = int(cash // close_price)
@@ -83,12 +84,12 @@ def backtest_strat(ticker, buy_thresh, sell_thresh, adx_thresh):
             if close_price > max_price:
                 max_price = close_price  
 
-            trailing_floor = max_price * 0.93
+            trailing_floor = max_price * stop_loss
 
             if close_price < trailing_floor:
                 cash += position * close_price
                 position = 0
-            elif close_price >= purchase_price * 1.05:
+            elif close_price >= purchase_price * profit_target:
                 cash += position * close_price
                 position = 0
             elif ema_sell_signal and adx_today >= adx_thresh:
@@ -102,9 +103,11 @@ def backtest_strat(ticker, buy_thresh, sell_thresh, adx_thresh):
     return portfolio_return
 
 # Optimization inputs
-buy_options = [0.001, 0.0025, 0.005, 0.0075, 0.010]
-sell_options = [-0.01, -0.025, -0.05, -0.075, -0.10]
-adx_options = [10, 15, 20, 25, 30]
+buy_options = [0.001,  0.005,  0.010]
+sell_options = [-0.01,  -0.05,  -0.10]
+adx_options = [ 15, 20, 25]
+stop_loss_options = [0.90, 0.93, 0.95, 0.97, ]
+profit_target_options = [ 1.05, 1.08, 1.10, ]
 
 test_tickers = ["META", "AMZN", "AAPL", "GOOGL", "MSFT", "NVDA", "TSLA", "AMD", "NFLX", "COST"]
 best_results_by_stock = {}
@@ -117,11 +120,13 @@ for ticker in test_tickers:
     for b in buy_options:
         for s in sell_options:
             for a in adx_options:
-                final_val = backtest_strat(ticker=ticker, buy_thresh=b, sell_thresh=s, adx_thresh=a)
-                
-                if final_val > best_return:
-                    best_return = final_val
-                    best_params = {'buy_spread': b, 'sell_spread': s, 'adx_cutoff': a}
+                for l in stop_loss_options:
+                    for p in profit_target_options:
+                        final_val = backtest_strat(ticker=ticker, buy_thresh=b, sell_thresh=s, adx_thresh=a, stop_loss=l, profit_target=p)
+
+                        if final_val > best_return:
+                            best_return = final_val
+                            best_params = {'buy_spread': b, 'sell_spread': s, 'adx_cutoff': a, 'stop_loss': l, 'profit_target': p}
                     
     best_results_by_stock[ticker] = {
         "final_value": best_return,
