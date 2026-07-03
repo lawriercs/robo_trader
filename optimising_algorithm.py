@@ -66,10 +66,6 @@ def optimise_parameters(ticker, buy_options, sell_options, adx_options, stop_los
             close_price = close_prices_full.iloc[i]
             adx_today = adx_values_full.iloc[i]
 
-            if i < 200:
-                portfolio_value.append(cash)
-                continue
-
             e12_today = ema_values_12_full.iloc[i]
             e26_today = ema_values_26_full.iloc[i]
             e200_today = ema_values_200_full.iloc[i]
@@ -142,7 +138,7 @@ def optimise_parameters(ticker, buy_options, sell_options, adx_options, stop_los
     return best_results_by_stock, best_params 
 
 
-results = optimise_parameters(
+best_results_by_stock, best_params = optimise_parameters(
     ticker=ticker_pool,
     buy_options=[0.001, 0.005, 0.01], 
     sell_options=[-0.01, -0.05, -0.1], 
@@ -155,6 +151,7 @@ results = optimise_parameters(
 
 # --- FIX 3: Restructured clean terminal printing routine outside the function scope ---
 print("\n--- OPTIMIZATION SUMMARY ---")
-for stock, data in results.items():
+for stock, data in best_results_by_stock.items():
     print(f"{stock}: Max Return {data['final_value']:.2f}% using {data['parameters']}")
-    
+
+print (best_results_by_stock['AAPL']['parameters']['buy_spread'])
