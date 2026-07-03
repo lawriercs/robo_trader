@@ -13,9 +13,9 @@ ticker_pool = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "
     #"UAL", "BA", "CAT", "DE", "GE", "MMM", "F", "GM", "UBER", "ABNB", "COIN", "PLTR"]
 ]
 
-ticker = "META"  
+ticker = "AAPL"  
 # Download data for the defined pool of tickers and SPY as a benchmark
-raw_data = yf.download(ticker_pool + ["SPY"], period = '300d', interval="1h")
+raw_data = yf.download(ticker_pool + ["SPY"], start = "2024-08-01", end = "2026-06-02", interval="1h")
 
 # Create a dataset of close prices and volumes
 close_prices = raw_data['Close'].copy().astype(float)
@@ -112,13 +112,13 @@ for i in range(len(close_prices)):
     ema_spread_12_26 = (e12_today - e26_today) / e26_today
 
     #ema_buy_signal = (e12_today > e200_today) and (e12_yest < e200_yest) and (e26_today > e50_today) 
-    ema_buy_signal = (ema_spread_12_26 > 0.005) #and (e50_today > e200_today)
+    ema_buy_signal = (ema_spread_12_26 > 0.001) #and (e50_today > e200_today)
     ema_sell_signal = (ema_spread_12_26 < -0.01) 
 
     #market_is_trending = adx_today > 20
 
     # Execution Logic
-    if ema_buy_signal and adx_today >= 20 and position == 0:
+    if ema_buy_signal and adx_today >= 25 and position == 0:
         position = int(cash // close_price)
         purchase_price = close_price
         max_price = close_price
@@ -129,7 +129,7 @@ for i in range(len(close_prices)):
         if close_price > max_price:
             max_price = close_price  
 
-        trailing_floor = max_price * 0.93
+        trailing_floor = max_price * 0.97
 
         if close_price < trailing_floor:
             cash += position * close_price
@@ -138,12 +138,12 @@ for i in range(len(close_prices)):
             purchase_price = 0.0
             
 
-        elif close_price >= purchase_price * 1.08: # Sell at an 8% gain
+        elif close_price >= purchase_price * 1.05: # Sell at an 8% gain
             cash += position * close_price
             position = 0
             purchase_price = 0.0
 
-        elif ema_sell_signal and adx_today >= 20 and position > 0:
+        elif ema_sell_signal and adx_today >= 25 and position > 0:
             cash += position * close_price
             #print(f"Sold {position} shares at {close_price:.2f} | Profit: {(close_price - purchase_price) * position:.2f}")
             position = 0
@@ -160,7 +160,7 @@ for i in range(len(close_prices)):
     portfolio_value.append(current_step_value)
     
     if position > 0:
-        trailing_floor_history.append(max_price * 0.93)
+        trailing_floor_history.append(max_price * 0.97)
     else:
         trailing_floor_history.append(np.nan)
 
