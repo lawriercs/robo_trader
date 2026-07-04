@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-ticker_pool = ["AAPL", "MSFT"]
+ticker_pool = ["AAPL"]#, "MSFT"]
 
 print("Downloading data...")
 raw_data = yf.download(ticker_pool + ["SPY"], start = "2024-08-01", end = "2026-06-02", interval="1h")
@@ -18,8 +18,6 @@ def optimise_parameters(ticker, buy_options, sell_options, adx_options, stop_los
         
         up_move = high.diff()
         down_move = -low.diff()
-
-
         
         pos_dm = up_move.where((up_move > down_move) & (up_move > 0), 0.0)
         neg_dm = down_move.where((down_move > up_move) & (down_move > 0), 0.0)
@@ -39,9 +37,9 @@ def optimise_parameters(ticker, buy_options, sell_options, adx_options, stop_los
         if isinstance(close_prices.columns, pd.MultiIndex):
             close_prices.columns = [col[1] for col in close_prices.columns]
 
-        high_prices_full = raw_data[('High', ticker)]
-        low_prices_full = raw_data[('Low', ticker)]
-        close_prices_full = raw_data[('Close', ticker)]
+        high_prices_full = raw_data['High'][ticker]
+        low_prices_full = raw_data['Low'][ticker]
+        close_prices_full = raw_data['Close'][ticker]
 
         adx_values_full = calculate_adx(high_prices_full, low_prices_full, close_prices_full, period=14)
 
@@ -101,7 +99,7 @@ def optimise_parameters(ticker, buy_options, sell_options, adx_options, stop_los
                 
             portfolio_value.append(cash + (position * close_price))
 
-        portfolio_start_value = portfolio_value[200]
+        portfolio_start_value = portfolio_value[0]
         portfolio_return = ((portfolio_value[-1] / portfolio_start_value) - 1) * 100
         return portfolio_return
 
@@ -153,5 +151,4 @@ best_results_by_stock, best_params = optimise_parameters(
 print("\n--- OPTIMIZATION SUMMARY ---")
 for stock, data in best_results_by_stock.items():
     print(f"{stock}: Max Return {data['final_value']:.2f}% using {data['parameters']}")
-
 print (best_results_by_stock['AAPL']['parameters']['buy_spread'])

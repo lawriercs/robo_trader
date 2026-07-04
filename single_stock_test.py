@@ -3,23 +3,42 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+from optimising_algorithm import optimise_parameters
+
 # Define pool of tickers
-ticker_pool = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX", "COST",
+ticker_pool = ["AAPL"]  #, "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX", "COST",
     #"INTC", "CSCO", "CMCSA", "PEP", "ADBE", "QCOM", "TXN", "AMGN", "HON", "AMAT",
     #"SBUX", "BKNG", "VRTX", "MDLZ", "GILD", "REGN", "LRCX", "PANW", "SNPS", "KLAC",
     #"CDNS", "ASML", "MELI", "MAR", "ORLY", "CTAS", "NXPI", "WDAY", "MNST", "LULU",
     #"JPM", "BAC", "WMT", "DIS", "XOM", "CVX", "UNH", "HD", "V", "MA", "PG", "ABBV",
-    #"LLY", "MRK", "PFE", "T", "VZ", "KO", "ORCL", "CRM", "NKE", "ADSK", "AAL", "DAL",
-    #"UAL", "BA", "CAT", "DE", "GE", "MMM", "F", "GM", "UBER", "ABNB", "COIN", "PLTR"]
-]
+    #"LLY", "MRK", "PFE",("MSFT")
 
-ticker = "AAPL"  
+    #"UAL", "BA", "CAT", "DE", "GE", "MMM", "F", "GM", "UBER", "ABNB", "COIN", "PLTR"]
+ticker = ticker_pool[0]  # Select the first ticker for testing
+
+#ticker = "MSFT"  
 # Download data for the defined pool of tickers and SPY as a benchmark
 raw_data = yf.download(ticker_pool + ["SPY"], start = "2024-08-01", end = "2026-06-02", interval="1h")
 
 # Create a dataset of close prices and volumes
 close_prices = raw_data['Close'].copy().astype(float)
 volumes = raw_data['Volume'].copy().astype(float)
+
+best_results_by_stock, best_params = optimise_parameters(
+    ticker=ticker_pool,
+    buy_options=[0.001, 0.005, 0.01], 
+    sell_options=[-0.01, -0.05, -0.1], 
+    adx_options=[15, 20, 25], 
+    stop_loss_options=[0.90, 0.93, 0.95, 0.97], 
+    profit_target_options=[1.05, 1.08, 1.10], 
+    start_idx=200, 
+    end_idx=len(raw_data)
+)
+
+optimised_buy_spread = best_results_by_stock[ticker]['parameters']['buy_spread']
+optimised_sell_spread = best_results_by_stock[ticker]['parameters']['sell_spread']
+optimised_adx_threshold = best_results_by_stock[ticker]['parameters']['adx_cutoff']
+optimised_stop_loss = best_results_by_stock[ticker]['parameters']['stop_loss']
 
 def calculate_adx(high, low, close, period=14):
     """Calculates the Average Directional Index (ADX) preserving Pandas tracking"""
@@ -112,13 +131,13 @@ for i in range(len(close_prices)):
     ema_spread_12_26 = (e12_today - e26_today) / e26_today
 
     #ema_buy_signal = (e12_today > e200_today) and (e12_yest < e200_yest) and (e26_today > e50_today) 
-    ema_buy_signal = (ema_spread_12_26 > 0.001) #and (e50_today > e200_today)
-    ema_sell_signal = (ema_spread_12_26 < -0.01) 
+    ema_buy_signal = (ema_spread_12_26 > optimised_buy_spread) #and (e50_today > e200_today)
+    ema_sell_signal = (ema_spread_12_26 < -optimised_sell_spread) 
 
     #market_is_trending = adx_today > 20
 
     # Execution Logic
-    if ema_buy_signal and adx_today >= 25 and position == 0:
+    if ema_buy_signal and adx_today >= optimised_adx_threshold and position == 0:
         position = int(cash // close_price)
         purchase_price = close_price
         max_price = close_price
@@ -129,8 +148,7 @@ for i in range(len(close_prices)):
         if close_price > max_price:
             max_price = close_price  
 
-        trailing_floor = max_price * 0.97
-
+        trailing_floor = max_price * (optimised_stop_loss)
         if close_price < trailing_floor:
             cash += position * close_price
             #print(f"Trailing stop triggered. Sold at {close_price:.2f} | Peak was {max_price:.2f}")
@@ -143,7 +161,7 @@ for i in range(len(close_prices)):
             position = 0
             purchase_price = 0.0
 
-        elif ema_sell_signal and adx_today >= 25 and position > 0:
+        elif ema_sell_signal and adx_today >= optimised_adx_threshold and position > 0:
             cash += position * close_price
             #print(f"Sold {position} shares at {close_price:.2f} | Profit: {(close_price - purchase_price) * position:.2f}")
             position = 0
@@ -160,7 +178,7 @@ for i in range(len(close_prices)):
     portfolio_value.append(current_step_value)
     
     if position > 0:
-        trailing_floor_history.append(max_price * 0.97)
+        trailing_floor_history.append(max_price * (1 - optimised_stop_loss))
     else:
         trailing_floor_history.append(np.nan)
 
@@ -187,7 +205,7 @@ axs[0].plot(close_prices.index[200:], normalized_stock[200:], label=f'{ticker} P
 axs[0].plot(close_prices.index[200:], normalized_portfolio[200:], label='Strategy Performance (%)', color='orange', linewidth=2)
 axs[1].plot(close_prices.index[200:], ema_values_12[200:], label='EMA 12', color='green', linestyle='--', alpha=0.7)
 axs[1].plot(close_prices.index[200:], ema_values_26[200:], label='EMA 26', color='red', linestyle='--', alpha=0.7)
-axs[1].plot(close_prices.index[200:], trailing_floor_history, label='Trailing Stop (93% of Peak)', color='blue', linestyle=':', alpha=0.7)
+axs[1].plot(close_prices.index[200:], trailing_floor_history, label=f'Trailing Stop ({int(optimised_stop_loss * 100)}% of Peak)', color='blue', linestyle=':', alpha=0.7)
 axs[0].plot(close_prices.index[200:], normalized_sp500[200:], label='SPY Performance (%)', color='gray', linestyle='-', alpha=0.5)
 axs[1].plot(close_prices.index[200:], ema_values_200[200:], label='EMA 200', color='purple', linestyle='-', alpha=0.5)
 axs[1].plot(close_prices.index[200:], ema_values_50[200:], label='EMA 50', color='brown', linestyle='-', alpha=0.5)
