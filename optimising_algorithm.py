@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 #print("Downloading data...")
 #raw_data = yf.download(ticker_pool + ["SPY"], start = "2024-08-01", end = "2026-06-02", interval="1h")
 
-def optimise_parameters(ticker_pool, buy_options, sell_options, adx_options, stop_loss_options, profit_target_options, start_idx, end_idx, raw_data):
+def optimise_parameters(ticker, buy_options, sell_options, adx_options, stop_loss_options, profit_target_options, start_idx, end_idx, raw_data):
     def calculate_adx(high, low, close, period=14):
         tr1 = high - low
         tr2 = (high - close.shift(1)).abs()
@@ -110,7 +110,10 @@ def optimise_parameters(ticker_pool, buy_options, sell_options, adx_options, sto
     stop_loss_options = [0.90, 0.93, 0.95, 0.97, ]
     profit_target_options = [ 1.05, 1.08, 1.10, ]
 #"
-    test_tickers = ticker_pool
+    if isinstance(ticker, str):
+        test_tickers = [ticker]
+    else:
+        test_tickers = ticker
     best_results_by_stock = {}
 
     for ticker in test_tickers:
