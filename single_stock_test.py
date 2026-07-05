@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from optimising_algorithm import optimise_parameters
 
 # Define pool of tickers
-ticker_pool = ["AAPL"]  #, "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX", "COST",
+ticker_pool = ["AMD"]  #, "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX", "COST",
     #"INTC", "CSCO", "CMCSA", "PEP", "ADBE", "QCOM", "TXN", "AMGN", "HON", "AMAT",
     #"SBUX", "BKNG", "VRTX", "MDLZ", "GILD", "REGN", "LRCX", "PANW", "SNPS", "KLAC",
     #"CDNS", "ASML", "MELI", "MAR", "ORLY", "CTAS", "NXPI", "WDAY", "MNST", "LULU",
@@ -16,7 +16,6 @@ ticker_pool = ["AAPL"]  #, "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "NFLX
     #"UAL", "BA", "CAT", "DE", "GE", "MMM", "F", "GM", "UBER", "ABNB", "COIN", "PLTR"]
 ticker = ticker_pool[0]  # Select the first ticker for testing
 
-#ticker = "MSFT"  
 # Download data for the defined pool of tickers and SPY as a benchmark
 raw_data = yf.download(ticker_pool + ["SPY"], start = "2024-08-01", end = "2026-06-02", interval="1h")
 
@@ -25,20 +24,22 @@ close_prices = raw_data['Close'].copy().astype(float)
 volumes = raw_data['Volume'].copy().astype(float)
 
 best_results_by_stock, best_params = optimise_parameters(
-    ticker=ticker_pool,
+    ticker_pool=ticker_pool,
     buy_options=[0.001, 0.005, 0.01], 
     sell_options=[-0.01, -0.05, -0.1], 
     adx_options=[15, 20, 25], 
     stop_loss_options=[0.90, 0.93, 0.95, 0.97], 
     profit_target_options=[1.05, 1.08, 1.10], 
     start_idx=200, 
-    end_idx=len(raw_data)
+    end_idx=len(raw_data),
+    raw_data=raw_data
 )
 
 optimised_buy_spread = best_results_by_stock[ticker]['parameters']['buy_spread']
 optimised_sell_spread = best_results_by_stock[ticker]['parameters']['sell_spread']
 optimised_adx_threshold = best_results_by_stock[ticker]['parameters']['adx_cutoff']
 optimised_stop_loss = best_results_by_stock[ticker]['parameters']['stop_loss']
+optimised_profit_target = best_results_by_stock[ticker]['parameters']['profit_target']
 
 def calculate_adx(high, low, close, period=14):
     """Calculates the Average Directional Index (ADX) preserving Pandas tracking"""
@@ -85,12 +86,12 @@ losses = -price_changes.clip(upper=0)
 
 # Calculate a short and a longer EMA
 ema_period_26 = 26
-ema_values_26 = close_prices[ticker].ewm(span=ema_period_26, adjust=False).mean()
+ema_values_26 = raw_data['Close'][ticker].ewm(span=ema_period_26, adjust=False).mean()
 ema_period_12 = 12
-ema_values_12 = close_prices[ticker].ewm(span=ema_period_12, adjust=False).mean()
+ema_values_12 = raw_data['Close'][ticker].ewm(span=ema_period_12, adjust=False).mean()
 ema_period_200 = 200
-ema_values_200 = close_prices[ticker].ewm(span=ema_period_200, adjust=False).mean()
-ema_values_50 = close_prices[ticker].ewm(span=50, adjust=False).mean()
+ema_values_200 = raw_data['Close'][ticker].ewm(span=ema_period_200, adjust=False).mean()
+ema_values_50 = raw_data['Close'][ticker].ewm(span=50, adjust=False).mean()
 
 # Calculating EMA crossover signals
 ema_values_12_changes = ema_values_12.diff()
@@ -130,11 +131,8 @@ for i in range(len(close_prices)):
 
     ema_spread_12_26 = (e12_today - e26_today) / e26_today
 
-    #ema_buy_signal = (e12_today > e200_today) and (e12_yest < e200_yest) and (e26_today > e50_today) 
     ema_buy_signal = (ema_spread_12_26 > optimised_buy_spread) #and (e50_today > e200_today)
-    ema_sell_signal = (ema_spread_12_26 < -optimised_sell_spread) 
-
-    #market_is_trending = adx_today > 20
+    ema_sell_signal = (ema_spread_12_26 < optimised_sell_spread) 
 
     # Execution Logic
     if ema_buy_signal and adx_today >= optimised_adx_threshold and position == 0:
@@ -156,7 +154,7 @@ for i in range(len(close_prices)):
             purchase_price = 0.0
             
 
-        elif close_price >= purchase_price * 1.05: # Sell at an 8% gain
+        elif close_price >= purchase_price * optimised_profit_target: # Sell at an 8% gain
             cash += position * close_price
             position = 0
             purchase_price = 0.0
@@ -178,7 +176,7 @@ for i in range(len(close_prices)):
     portfolio_value.append(current_step_value)
     
     if position > 0:
-        trailing_floor_history.append(max_price * (1 - optimised_stop_loss))
+        trailing_floor_history.append(max_price * (optimised_stop_loss))
     else:
         trailing_floor_history.append(np.nan)
 

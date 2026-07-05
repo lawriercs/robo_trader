@@ -4,12 +4,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-ticker_pool = ["AAPL"]#, "MSFT"]
+#ticker_pool = ["NFLX"]
 
-print("Downloading data...")
-raw_data = yf.download(ticker_pool + ["SPY"], start = "2024-08-01", end = "2026-06-02", interval="1h")
+#print("Downloading data...")
+#raw_data = yf.download(ticker_pool + ["SPY"], start = "2024-08-01", end = "2026-06-02", interval="1h")
 
-def optimise_parameters(ticker, buy_options, sell_options, adx_options, stop_loss_options, profit_target_options, start_idx, end_idx):
+def optimise_parameters(ticker_pool, buy_options, sell_options, adx_options, stop_loss_options, profit_target_options, start_idx, end_idx, raw_data):
     def calculate_adx(high, low, close, period=14):
         tr1 = high - low
         tr2 = (high - close.shift(1)).abs()
@@ -136,19 +136,19 @@ def optimise_parameters(ticker, buy_options, sell_options, adx_options, stop_los
     return best_results_by_stock, best_params 
 
 
-best_results_by_stock, best_params = optimise_parameters(
-    ticker=ticker_pool,
-    buy_options=[0.001, 0.005, 0.01], 
-    sell_options=[-0.01, -0.05, -0.1], 
-    adx_options=[15, 20, 25], 
-    stop_loss_options=[0.90, 0.93, 0.95, 0.97], 
-    profit_target_options=[1.05, 1.08, 1.10], 
-    start_idx=200, 
-    end_idx=len(raw_data)
-)
+# best_results_by_stock, best_params = optimise_parameters(
+#     ticker=ticker_pool,
+#     buy_options=[0.001, 0.005, 0.01], 
+#     sell_options=[-0.01, -0.05, -0.1], 
+#     adx_options=[15, 20, 25], 
+#     stop_loss_options=[0.90, 0.93, 0.95, 0.97], 
+#     profit_target_options=[1.05, 1.08, 1.10], 
+#     start_idx=200, 
+#     end_idx=len(raw_data)
+# )
 
-# --- FIX 3: Restructured clean terminal printing routine outside the function scope ---
-print("\n--- OPTIMIZATION SUMMARY ---")
-for stock, data in best_results_by_stock.items():
-    print(f"{stock}: Max Return {data['final_value']:.2f}% using {data['parameters']}")
-print (best_results_by_stock['AAPL']['parameters']['buy_spread'])
+# # --- FIX 3: Restructured clean terminal printing routine outside the function scope ---
+# print("\n--- OPTIMIZATION SUMMARY ---")
+# for stock, data in best_results_by_stock.items():
+#     print(f"{stock}: Max Return {data['final_value']:.2f}% using {data['parameters']}")
+# print (best_results_by_stock[ticker_pool[0]]['parameters']['buy_spread'])
